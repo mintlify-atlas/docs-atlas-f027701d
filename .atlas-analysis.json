@@ -1,0 +1,93 @@
+{
+  "projectType": "saas",
+  "projectName": "cineCDMX",
+  "projectDescription": "A Django-based cinema management platform for Mexico City that lets customers browse movies and buy tickets, while employees manage screenings, and admins control users and branches.",
+  "theme": "almond",
+  "primaryColor": "#C0392B",
+  "lightColor": "#E74C3C",
+  "darkColor": "#922B21",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "deployment"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/cartelera",
+              "features/peliculas",
+              "features/funciones",
+              "features/boletos",
+              "features/sucursales"
+            ]
+          },
+          {
+            "group": "User Roles",
+            "pages": [
+              "roles/overview",
+              "roles/cliente",
+              "roles/empleado",
+              "roles/admin"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/tmdb",
+              "integrations/google-oauth"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/environment-variables",
+              "configuration/database"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Internal API Endpoints",
+            "pages": [
+              "api/overview",
+              "api/search-tmdb",
+              "api/detalles-tmdb",
+              "api/horarios-disponibles"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Multi-branch cinema management across Mexico City locations",
+    "Movie catalog with TMDB API integration for posters and metadata",
+    "Screening schedule management with conflict detection",
+    "Interactive seat selection and ticket purchasing",
+    "Role-based access control (Admin, Employee, Customer)",
+    "Google OAuth login via django-allauth",
+    "Employee dashboard with full CRUD for movies, screenings, and genres",
+    "Admin panel for user and branch management"
+  ],
+  "publicApiSurface": [
+    "GET /api/buscar_tmdb/?query=<title>",
+    "GET /api/detalles_tmdb/?tmdb_id=<id>",
+    "GET /api/horarios_disponibles/?sala=<id>&fecha=<date>",
+    "GET / (cartelera_view)",
+    "GET /pelicula/<id>/ (detalle_pelicula_view)",
+    "POST /funcion/<id>/comprar/ (comprar_boletos_view)",
+    "POST /login/ (login_view)",
+    "GET /logout/ (logout_view)"
+  ]
+}
