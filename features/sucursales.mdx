@@ -1,0 +1,118 @@
+---
+title: "Sucursales (Branch Management)"
+description: Multi-branch cinema management across Mexico City.
+---
+
+cineCDMX supports multiple cinema branches across Mexico City. Each branch (`Sucursal`) contains one or more screening rooms (`Sala`). Employees manage salas from the dashboard; branch selection is available sitewide via the `?sucursal=<id>` query parameter.
+
+## Models
+
+### Sucursal
+
+| Field | Type | Notes |
+|---|---|---|
+| `nombre` | `CharField(max_length=100)` | Display name of the branch |
+
+Sample branches seeded by `poblar_bd.py`:
+
+<CardGroup cols={2}>
+  <Card title="CDMX Norte">
+    Northern Mexico City location.
+  </Card>
+  <Card title="CDMX Oriente">
+    Eastern Mexico City location.
+  </Card>
+  <Card title="Reforma">
+    Paseo de la Reforma location.
+  </Card>
+  <Card title="Perisur">
+    Perisur shopping center location.
+  </Card>
+</CardGroup>
+
+### Sala
+
+| Field | Type | Notes |
+|---|---|---|
+| `numero` | `IntegerField` | Room number within the branch |
+| `sucursal` | `ForeignKey(Sucursal)` | `CASCADE` on delete; `related_name='salas'` |
+| `capacidad` | `IntegerField(default=50)` | Seating capacity — must be between 25 and 144 |
+
+The string representation is `"Sala <numero> - <sucursal.nombre>"`.
+
+## SalaForm validation
+
+| Rule | Detail |
+|---|---|
+| `numero > 0` | Room number must be a positive integer |
+| `25 ≤ capacidad ≤ 144` | Capacity outside this range raises a `ValidationError` |
+| No duplicate room number per branch | `clean()` checks for an existing `Sala` with the same `numero` + `sucursal`. On edit, the current instance is excluded from the check |
+
+```python
+# Duplicate check in SalaForm.clean()
+qs = Sala.objects.filter(numero=numero, sucursal=sucursal)
+if self.instance and self.instance.pk:
+    qs = qs.exclude(pk=self.instance.pk)
+if qs.exists():
+    raise forms.ValidationError(
+        f"Ya existe la sala {numero} en la sucursal {sucursal.nombre}."
+    )
+```
+
+## Views
+
+### `salas_view` — List and create salas
+
+**URL:** `GET/POST /salas/`  
+**Access:** Employee only
+
+Displays all salas ordered by `sucursal__nombre` then `numero`. The same page hosts the creation form. On valid `POST`, the sala is saved and the view redirects back to `/salas/`.
+
+### `editar_sala_view` — Edit a sala
+
+**URL:** `GET/POST /salas/<sala_id>/editar/`  
+**Access:** Employee only
+
+Loads the existing `Sala` instance into `SalaForm`. On valid `POST`, saves the changes and redirects to `/salas/`. The edit form shares the same template as the list/create view, with the `editando` context variable indicating which sala is being modified.
+
+### `eliminar_sala_view` — Delete a sala
+
+**URL:** `POST /salas/<sala_id>/eliminar/`  
+**Access:** Employee only
+
+Before deleting, the view checks whether any `Funcion` records reference this sala:
+
+```python
+if sala.funcion_set.exists():
+    # Returns an error — cannot delete
+```
+
+<Warning>
+A sala cannot be deleted while it has scheduled funciones. You must first remove or reassign all funciones for that sala before deletion is allowed.
+</Warning>
+
+A `GET` request to the delete URL is silently ignored — the view redirects back to `/salas/` without performing any action.
+
+## Sitewide branch filter
+
+The `?sucursal=<id>` query parameter is supported across all major views:
+
+| View | Effect |
+|---|---|
+| `cartelera_view` | Shows only movies with upcoming funciones at that branch |
+| `detalle_pelicula_view` | Shows only funciones for that movie at that branch |
+| `dashboard_empleado_view` | Filters salas, funciones, and movies to the selected branch |
+
+All three views pass `sucursales` (all branches) and `sucursal_seleccionada` (the active filter ID) to the template so the branch selector UI is always consistent.
+
+<Tip>
+Links to filtered views can be bookmarked or shared. For example, `/pelicula/5/?sucursal=2` opens the detail page for movie 5 showing only screenings at branch 2.
+</Tip>
+
+## URL patterns
+
+| Method | URL | View | Name |
+|---|---|---|---|
+| GET/POST | `/salas/` | `salas_view` | `salas` |
+| GET/POST | `/salas/<id>/editar/` | `editar_sala_view` | `editar_sala` |
+| POST | `/salas/<id>/eliminar/` | `eliminar_sala_view` | `eliminar_sala` |

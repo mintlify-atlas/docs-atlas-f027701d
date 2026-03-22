@@ -1,0 +1,96 @@
+---
+title: "Boletos (Ticket Purchasing)"
+description: Seat selection and ticket purchasing workflow.
+---
+
+The boleto system handles seat selection and ticket creation for a given `Funcion`. Purchases are allowed for both authenticated users and guests — no login is required to buy a ticket.
+
+## Boleto model
+
+| Field | Type | Notes |
+|---|---|---|
+| `funcion` | `ForeignKey(Funcion)` | `CASCADE` on delete; `related_name='boletos'` |
+| `asiento` | `CharField(max_length=10)` | Seat identifier, e.g. `"A1"`, `"B3"` |
+| `precio` | `DecimalField(max_digits=6, decimal_places=2)` | Default `32.00`; set from `pelicula.costo_entrada` at purchase time |
+| `usuario` | `ForeignKey(Usuario)` | `SET_NULL`, nullable — anonymous purchases are allowed |
+| `fecha_compra` | `DateTimeField(auto_now_add=True)` | Set automatically on creation |
+
+### Pricing
+
+The price per seat is determined by the movie's `costo_entrada` field, not a fixed global value:
+
+| Type | Price |
+|---|---|
+| Común | $32.00 MXN |
+| Estreno | $80.00 MXN |
+
+The price is read from `funcion.pelicula.costo_entrada` at the moment of purchase and stored on each `Boleto` record, so price changes to the movie do not retroactively affect existing tickets.
+
+## `comprar_boletos_view`
+
+**URL:** `GET/POST /funcion/<funcion_id>/comprar/`  
+**Access:** Public (login not required)
+
+### GET — seat map
+
+The view queries all boletos already issued for the funcion and passes their seat identifiers to the template:
+
+```python
+asientos_ocupados = funcion.boletos.values_list('asiento', flat=True)
+```
+
+The seat map in the template uses this list to mark occupied seats before the user makes a selection.
+
+| Context variable | Description |
+|---|---|
+| `funcion` | The `Funcion` instance |
+| `precio_boleto` | `funcion.pelicula.costo_entrada` |
+| `asientos_ocupados` | List of already-purchased seat IDs |
+
+### POST — purchase
+
+The form submits a comma-separated string of selected seat identifiers in the `asientos` field:
+
+```
+asientos=A1,A2,B3
+```
+
+The view splits this string and creates one `Boleto` per seat:
+
+```python
+asientos_list = asientos_str.split(',')
+for asiento in asientos_list:
+    Boleto.objects.create(
+        funcion=funcion,
+        asiento=asiento,
+        precio=funcion.pelicula.costo_entrada,
+        usuario=usuario  # None if guest
+    )
+```
+
+The `usuario` is resolved from the session: if `usuario_id` is present and the corresponding `Usuario` record exists, it is linked to each boleto. If the session has no `usuario_id` (anonymous visitor), `usuario=None` is stored and the purchase still succeeds.
+
+On success, the view renders `compra_exitosa.html` with `funcion` and `asientos_list` in context.
+
+<Note>
+Guests (visitors who are not logged in) can purchase tickets. Their boletos are created with `usuario=NULL` and are not associated with any account. If the guest later signs in, previously purchased anonymous tickets cannot be retroactively linked.
+</Note>
+
+## Seat map behavior
+
+The interactive seat map on the purchase page works as follows:
+
+1. The template receives `asientos_ocupados` as a pre-loaded list from the database.
+2. Occupied seats are rendered as non-selectable in the UI.
+3. The user clicks available seats; the selection is serialized to a comma-separated string and placed in the hidden `asientos` input on submit.
+
+<Warning>
+There is no server-side check for double-booking at the moment of `Boleto.objects.create`. If two users select the same seat simultaneously and both submit before either request completes, duplicate boletos can be created for the same seat. A `unique_together` constraint on `(funcion, asiento)` at the model level would prevent this.
+</Warning>
+
+## URL patterns
+
+| Method | URL | View | Name |
+|---|---|---|---|
+| GET | `/funcion/<id>/comprar/` | `comprar_boletos_view` | `comprar_boletos` |
+| POST | `/funcion/<id>/comprar/` | `comprar_boletos_view` | `comprar_boletos` |

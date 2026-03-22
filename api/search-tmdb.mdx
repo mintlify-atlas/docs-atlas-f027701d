@@ -1,0 +1,86 @@
+---
+title: 'Search TMDB'
+description: Search for movies in The Movie Database by title.
+---
+
+Searches TMDB for movies matching a given title string. Results are returned in Spanish (Mexico) and include titles, overviews, poster paths, and TMDB IDs.
+
+This endpoint is used by the employee dashboard's movie creation form to look up a film before saving it to cineCDMX.
+
+```
+GET /api/buscar_tmdb/
+```
+
+## Query parameters
+
+<ParamField query="query" type="string" required>
+  The movie title to search for. If empty or omitted, returns `{"results": []}` immediately without calling TMDB.
+</ParamField>
+
+## Response fields
+
+<ResponseField name="results" type="object[]">
+  List of matching movies from TMDB. The full TMDB search response is returned as-is.
+  <Expandable title="result object properties">
+    <ResponseField name="id" type="integer">
+      TMDB movie ID. Use this value with [GET /api/detalles_tmdb/](/api/detalles-tmdb) to fetch the runtime.
+    </ResponseField>
+    <ResponseField name="title" type="string">
+      Movie title in Spanish (es-MX).
+    </ResponseField>
+    <ResponseField name="overview" type="string">
+      Plot summary in Spanish (es-MX).
+    </ResponseField>
+    <ResponseField name="poster_path" type="string">
+      Relative poster image path. Prepend `https://image.tmdb.org/t/p/w500` to build a full URL.
+    </ResponseField>
+    <ResponseField name="runtime" type="integer | null">
+      Runtime in minutes. This field is not populated in search results — use [GET /api/detalles_tmdb/](/api/detalles-tmdb) to retrieve it.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="total_results" type="integer">
+  Total number of matching movies across all pages in the TMDB index.
+</ResponseField>
+
+<ResponseField name="total_pages" type="integer">
+  Total number of result pages available. This endpoint always fetches page 1.
+</ResponseField>
+
+## Fallback behavior
+
+| Condition | Response |
+|---|---|
+| `query` is empty or missing | `{"results": []}` |
+| TMDB connection error | `{"results": []}` |
+
+## Example
+
+**Request**
+
+```http
+GET /api/buscar_tmdb/?query=guardianes
+```
+
+**Response**
+
+```json
+{
+  "results": [
+    {
+      "id": 118340,
+      "title": "Guardianes de la Galaxia",
+      "overview": "...",
+      "poster_path": "/r7vmZjiyZw9rpJMQJdXpjgi0effq.jpg",
+      "runtime": null
+    }
+  ],
+  "total_results": 1,
+  "total_pages": 1
+}
+```
+
+<Note>
+  The `runtime` field in search results is always `null`. To get the runtime for a specific movie, call [GET /api/detalles_tmdb/](/api/detalles-tmdb) with the movie's `id`.
+</Note>

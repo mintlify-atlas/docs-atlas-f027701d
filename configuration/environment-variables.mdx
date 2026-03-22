@@ -1,0 +1,123 @@
+---
+title: 'Environment Variables'
+description: All environment variables used by cineCDMX.
+---
+
+cineCDMX reads its runtime configuration from environment variables, loaded via `python-dotenv` at startup. All variables are read in `cine_cdmx/settings.py`.
+
+<Tip>
+  `python-dotenv` is already included in the project requirements. Create a `.env` file at the project root and it will be loaded automatically when Django starts. Never commit this file to version control.
+</Tip>
+
+## Variable reference
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `SECRET_KEY` | Yes | `django-insecure-default-key-replace-this-in-env` | Django secret key used for cryptographic signing of sessions, CSRF tokens, and other security features. |
+| `DEBUG` | No | `False` | Set to `True` to enable Django debug mode. Defaults to `False` if the variable is absent or any value other than `True`. |
+| `DATABASE_URL` | Yes | None | PostgreSQL connection URL, parsed by `dj-database-url`. |
+| `ALLOWED_HOSTS` | No | `127.0.0.1,localhost` | Comma-separated list of hostnames Django is permitted to serve. |
+| `TMDB_API_KEY` | Yes* | None | API key for The Movie Database. Required for movie poster and metadata features. |
+| `GOOGLE_CLIENT_ID` | No | None | OAuth 2.0 client ID from Google Cloud Console. Required if Google sign-in is enabled. |
+| `GOOGLE_CLIENT_SECRET` | No | None | OAuth 2.0 client secret from Google Cloud Console. Required if Google sign-in is enabled. |
+
+\* `TMDB_API_KEY` is technically optional at startup, but movie search and poster functionality will not work without it.
+
+---
+
+## Variable details
+
+### `SECRET_KEY`
+
+<Warning>
+  The default value (`django-insecure-default-key-replace-this-in-env`) must **never** be used in production. It is public knowledge and provides no security. Generate a unique key with:
+
+  ```bash
+  python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+  ```
+</Warning>
+
+Django uses this key to sign cookies, sessions, CSRF tokens, and password reset links. If the key is compromised or reused across deployments, all signed data must be considered untrusted.
+
+---
+
+### `DEBUG`
+
+<Warning>
+  Never set `DEBUG=True` in production. Debug mode exposes full stack traces, local variables, and settings values to anyone who triggers an error — including potential attackers.
+</Warning>
+
+The setting is parsed as a string comparison: `os.getenv('DEBUG', 'False') == 'True'`. Only the exact string `True` (case-sensitive) enables debug mode. Any other value, including an absent variable, resolves to `False`.
+
+---
+
+### `DATABASE_URL`
+
+<Note>
+  The URL must follow the format:
+
+  ```
+  postgresql://USER:PASSWORD@HOST:PORT/DBNAME
+  ```
+
+  Example:
+
+  ```
+  postgresql://cine_user:secret@localhost:5432/cine_cdmx_db
+  ```
+
+  `dj-database-url` parses this URL and populates Django's `DATABASES` setting automatically, including connection pooling (`conn_max_age=600`) and health checks (`conn_health_checks=True`).
+</Note>
+
+---
+
+### `ALLOWED_HOSTS`
+
+Provide a comma-separated string. `settings.py` splits on `,` to produce the list Django requires:
+
+```python
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
+```
+
+Example for a production deployment:
+
+```
+ALLOWED_HOSTS=cinecdmx.example.com,www.cinecdmx.example.com
+```
+
+---
+
+### `TMDB_API_KEY`
+
+Obtain a free API key from [The Movie Database](https://www.themoviedb.org/settings/api). The key is exposed to Django views via `settings.TMDB_API_KEY` and is used to fetch movie metadata (title, synopsis, poster URL) when adding films through the admin interface.
+
+---
+
+### `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+
+These are passed to `django-allauth`'s Google social account provider. If either value is absent, the Google sign-in button will still render, but authentication attempts will fail. Configure an OAuth 2.0 credential in Google Cloud Console and set the authorized redirect URI to:
+
+```
+https://your-domain/accounts/google/login/callback/
+```
+
+---
+
+## Sample `.env` file
+
+```ini .env
+# Django core
+SECRET_KEY=replace-this-with-a-real-secret-key
+DEBUG=False
+ALLOWED_HOSTS=127.0.0.1,localhost
+
+# Database
+DATABASE_URL=postgresql://cine_user:secret@localhost:5432/cine_cdmx_db
+
+# TMDB integration
+TMDB_API_KEY=your_tmdb_api_key_here
+
+# Google OAuth (optional)
+GOOGLE_CLIENT_ID=your_google_client_id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+```

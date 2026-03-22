@@ -1,0 +1,130 @@
+---
+title: "TMDB Integration"
+description: Automatic movie data from The Movie Database API.
+---
+
+cineCDMX integrates with [The Movie Database (TMDB)](https://www.themoviedb.org/) to automatically populate movie posters, synopses, and runtimes. Employees search for a film by title, select the correct TMDB result, and the form pre-fills the relevant fields before saving.
+
+<Note>
+  All TMDB requests use `language=es-MX`, so titles, synopses, and other text fields are returned in Mexican Spanish whenever TMDB has a translation available.
+</Note>
+
+## Setup
+
+<Steps>
+  <Step title="Get a TMDB API key">
+    Create a free account at [themoviedb.org](https://www.themoviedb.org/settings/api) and request an API key under **Settings → API**.
+  </Step>
+  <Step title="Set the environment variable">
+    Add the key to your `.env` file:
+
+    ```bash .env
+    TMDB_API_KEY=your_api_key_here
+    ```
+
+    The application reads this with `os.getenv('TMDB_API_KEY')` and exposes it as `settings.TMDB_API_KEY`. Any surrounding quotes or spaces are stripped at call time:
+
+    ```python
+    api_key = str(settings.TMDB_API_KEY).strip(' "\'')
+    ```
+  </Step>
+</Steps>
+
+## Core helper: `get_data_from_tmdb`
+
+`get_data_from_tmdb(tmdb_id)` is the single function that talks to the TMDB movie detail endpoint. All other TMDB-related views call it.
+
+```python cartelera/views.py
+def get_data_from_tmdb(tmdb_id):
+    if not tmdb_id:
+        return None, None, None
+    api_key = str(settings.TMDB_API_KEY).strip(' "\'')
+    url = f"https://api.themoviedb.org/3/movie/{tmdb_id}?api_key={api_key}&language=es-MX"
+    try:
+        response = requests.get(url, headers={"accept": "application/json"})
+        if response.status_code == 200:
+            data = response.json()
+            poster_path = data.get("poster_path")
+            sinopsis = data.get("overview")
+            runtime = data.get("runtime")
+            poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
+            return poster_url, sinopsis, runtime
+    except Exception as e:
+        print(f"Error conectando a TMDB: {e}")
+    return None, None, None
+```
+
+**Endpoint called:**
+```
+GET https://api.themoviedb.org/3/movie/{tmdb_id}?api_key={api_key}&language=es-MX
+```
+
+**Return value:** a 3-tuple `(poster_url, sinopsis, runtime)`.
+
+| Value | Source field | Notes |
+|---|---|---|
+| `poster_url` | `poster_path` | Full URL: `https://image.tmdb.org/t/p/w500{poster_path}`. `None` if no poster. |
+| `sinopsis` | `overview` | Movie synopsis in `es-MX`. |
+| `runtime` | `runtime` | Duration in minutes as an integer. |
+
+On any network error or non-200 response the function returns `(None, None, None)` and logs the exception to stdout.
+
+## Views
+
+### `search_tmdb_view`
+
+Provides a live search endpoint used by the employee form to look up a movie by title before adding it. The view proxies the TMDB search API and returns results directly to the client as JSON.
+
+**Endpoint called:**
+```
+GET https://api.themoviedb.org/3/search/movie?api_key={key}&language=es-MX&query={query}&page=1
+```
+
+The `query` parameter is URL-encoded with `urllib.parse.quote`. On error or missing query, the view returns `{'results': []}`.
+
+Employees use the returned results to select the correct film and copy its TMDB ID into `PeliculaForm`, which then triggers `detalles_tmdb_view` to pre-fill the duration.
+
+### `detalles_tmdb_view`
+
+Called by the employee form via AJAX after a TMDB ID is entered. It calls `get_data_from_tmdb` and returns only the runtime so the duration field in `PeliculaForm` can be auto-filled.
+
+```python cartelera/views.py
+def detalles_tmdb_view(request):
+    tmdb_id = request.GET.get('tmdb_id')
+    if not tmdb_id:
+        return JsonResponse({'runtime': ''})
+    _, _, runtime = get_data_from_tmdb(tmdb_id)
+    return JsonResponse({'runtime': runtime})
+```
+
+Response: `{'runtime': <int | null>}`.
+
+### `actualizar_datos_tmdb_view`
+
+Employee-only action that refreshes an existing movie's TMDB data on demand. It is accessible from the employee dashboard.
+
+```python cartelera/views.py
+def actualizar_datos_tmdb_view(request, pelicula_id):
+    if request.session.get('usuario_rol') != 'EMPLEADO':
+        return redirect('cartelera')
+    pelicula = get_object_or_404(Pelicula, id=pelicula_id)
+    if pelicula.tmdb_id:
+        poster_url, sinopsis_api, duracion_api = get_data_from_tmdb(pelicula.tmdb_id)
+        if poster_url:
+            pelicula.imagen_url = poster_url
+        if sinopsis_api:
+            pelicula.sinopsis = sinopsis_api
+        if duracion_api:
+            pelicula.duracion_minutos = duracion_api
+        pelicula.save()
+    return redirect('dashboard_empleado')
+```
+
+Key behaviour:
+- Only fields that return a non-`None` value are updated, so a missing poster does not overwrite an existing one.
+- If the `Pelicula` record has no `tmdb_id`, the view skips the API call and redirects with a warning message.
+- Non-employees are redirected to the public cartelera.
+
+### On movie creation
+
+When an employee saves a new film through `agregar_pelicula_view`, TMDB data is fetched automatically if a `tmdb_id` was provided. Fields are only written if they are currently blank, so manually entered values are never overwritten on creation.

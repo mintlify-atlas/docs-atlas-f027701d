@@ -1,0 +1,56 @@
+---
+title: "User Roles Overview"
+description: How the three-tier role system works in cineCDMX.
+---
+
+cineCDMX uses three roles to control access across the platform. Every `Usuario` record has a `rol` field stored as a `CharField` with one of three values: `CLIENTE`, `EMPLEADO`, or `ADMIN`.
+
+## How roles are enforced
+
+Role checks happen directly inside each view function — there is no middleware layer. After a successful login, three values are written to the Django session:
+
+```python
+request.session['usuario_id']     # Usuario.id
+request.session['usuario_nombre'] # Usuario.nombre
+request.session['usuario_rol']    # 'CLIENTE' | 'EMPLEADO' | 'ADMIN'
+```
+
+Each protected view reads `request.session.get('usuario_rol')` and redirects unauthenticated or unauthorised requests before doing any work.
+
+## Role assignment
+
+| Method | Role assigned |
+|---|---|
+| Self-registration (email/password at `/login/`) | `CLIENTE` |
+| Google OAuth via `/accounts/` | `CLIENTE` (auto-created on first visit to cartelera) |
+| Created manually by an Admin | Any role (`CLIENTE`, `EMPLEADO`, or `ADMIN`) |
+
+There is no self-registration path for `EMPLEADO` or `ADMIN`. Those accounts must be created by an existing Admin from the `/usuarios/` panel.
+
+## Access summary
+
+| Capability | CLIENTE | EMPLEADO | ADMIN |
+|---|:---:|:---:|:---:|
+| Browse cartelera | Yes | Redirected to dashboard | Yes |
+| View movie details & funciones | Yes | Yes | Yes |
+| Purchase tickets | Yes | — | — |
+| Manage movies, funciones, genres, salas | — | Yes | — |
+| Manage all users | — | — | Yes |
+
+<Note>
+Google OAuth users are assigned the `CLIENTE` role automatically. The session is populated the first time they hit `cartelera_view` after authenticating via AllAuth (`/accounts/`).
+</Note>
+
+## Role pages
+
+<CardGroup cols={3}>
+  <Card title="Cliente" icon="user" href="/roles/cliente">
+    Default role for customers. Can browse and purchase tickets.
+  </Card>
+  <Card title="Empleado" icon="briefcase" href="/roles/empleado">
+    Branch staff. Manages movies, screenings, genres, and salas.
+  </Card>
+  <Card title="Admin" icon="shield" href="/roles/admin">
+    Full access. Creates and manages all user accounts.
+  </Card>
+</CardGroup>

@@ -1,0 +1,144 @@
+---
+title: "Google OAuth"
+description: Sign in with Google using django-allauth.
+---
+
+cineCDMX lets customers sign in with their Google account using [django-allauth](https://docs.allauth.org/). After a successful OAuth flow, allauth creates a Django `User` record and the application automatically creates a linked `Usuario` record with the `CLIENTE` role.
+
+## Settings
+
+The relevant configuration lives in `cine_cdmx/settings.py`.
+
+```python cine_cdmx/settings.py
+INSTALLED_APPS = [
+    ...
+    'django.contrib.sites',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
+]
+
+SITE_ID = 1
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
+
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'APP': {
+            'client_id': os.getenv('GOOGLE_CLIENT_ID'),
+            'secret': os.getenv('GOOGLE_CLIENT_SECRET'),
+            'key': ''
+        },
+        'SCOPE': ['profile', 'email'],
+        'AUTH_PARAMS': {'access_type': 'online'},
+    }
+}
+
+SOCIALACCOUNT_LOGIN_ON_GET = True  # skips allauth confirmation screen
+LOGIN_REDIRECT_URL  = '/'
+LOGOUT_REDIRECT_URL = '/'
+```
+
+| Setting | Value | Description |
+|---|---|---|
+| `SITE_ID` | `1` | Must match an existing `Site` record in the database. |
+| `SOCIALACCOUNT_LOGIN_ON_GET` | `True` | Skips the allauth intermediate confirmation page, sending users directly into the Google OAuth flow. |
+| `LOGIN_REDIRECT_URL` | `/` | Where allauth redirects after a successful login. |
+| `LOGOUT_REDIRECT_URL` | `/` | Where allauth redirects after logout. |
+| `SCOPE` | `profile`, `email` | Permissions requested from Google. |
+
+<Warning>
+  `SITE_ID = 1` must match an existing `django.contrib.sites.models.Site` record in the database. If the record is missing or the ID does not match, allauth will raise an error when attempting the OAuth callback. Create or verify the `Site` in Django admin under **Sites**.
+</Warning>
+
+## OAuth flow
+
+1. The user clicks **Sign in with Google** in the UI.
+2. The browser navigates to `/accounts/google/login/`.
+3. Because `SOCIALACCOUNT_LOGIN_ON_GET = True`, allauth skips its own confirmation screen and redirects immediately to Google's OAuth consent page.
+4. Google authenticates the user and redirects back to `/accounts/google/callback/`.
+5. allauth creates or retrieves a Django `User` record and redirects to `LOGIN_REDIRECT_URL` (`/`).
+6. `cartelera_view` runs. If `request.user.is_authenticated` and no `usuario_id` exists in the session yet, a `Usuario` record is created:
+
+```python cartelera/views.py
+if request.user.is_authenticated and 'usuario_id' not in request.session:
+    usuario, _ = Usuario.objects.get_or_create(
+        correo=request.user.email,
+        defaults={
+            'nombre': f"{request.user.first_name} {request.user.last_name}".strip()
+                      or request.user.username,
+            'password': 'NoAplica_SeLogueaPorGoogle',
+            'rol': 'CLIENTE',
+        }
+    )
+    request.session['usuario_id'] = usuario.id
+    request.session['usuario_nombre'] = usuario.nombre
+    request.session['usuario_rol'] = usuario.rol
+```
+
+The Google email is used as the unique key for `get_or_create`, so repeat logins retrieve the existing `Usuario` rather than creating a duplicate.
+
+### `Usuario` record defaults
+
+| Field | Value |
+|---|---|
+| `correo` | Google account email (lookup key) |
+| `nombre` | `first_name + last_name` from Django `User`, or `username` if both are blank |
+| `password` | `'NoAplica_SeLogueaPorGoogle'` — a sentinel value; authentication is handled entirely by Google |
+| `rol` | `'CLIENTE'` |
+
+<Note>
+  The `password` field on `Usuario` is a plain-text sentinel, not a Django hashed password. It exists only to satisfy the model constraint. Google OAuth users never authenticate with it.
+</Note>
+
+## Setup
+
+<Steps>
+  <Step title="Create a Google Cloud project and OAuth credentials">
+    Open [Google Cloud Console](https://console.cloud.google.com/), create a project, and navigate to **APIs & Services → Credentials → Create Credentials → OAuth 2.0 Client ID**. Choose **Web application**.
+  </Step>
+  <Step title="Add the authorized redirect URI">
+    Under **Authorized redirect URIs**, add:
+
+    <CodeGroup>
+
+    ```text Development
+    http://localhost:8000/accounts/google/callback/
+    ```
+
+    ```text Production
+    https://yourdomain.com/accounts/google/callback/
+    ```
+
+    </CodeGroup>
+  </Step>
+  <Step title="Set environment variables">
+    Copy the client ID and secret into your `.env` file:
+
+    ```bash .env
+    GOOGLE_CLIENT_ID=your_client_id_here
+    GOOGLE_CLIENT_SECRET=your_client_secret_here
+    ```
+  </Step>
+  <Step title="Run migrations">
+    allauth requires several database tables. Run migrations if you have not already:
+
+    ```bash
+    python manage.py migrate
+    ```
+
+    This creates the `django_site`, `socialaccount_socialapp`, and related tables.
+  </Step>
+  <Step title="Configure Site and SocialApp in Django admin">
+    1. Go to **Django admin → Sites** and ensure a `Site` record exists with `id=1`. Set the domain and display name to match your environment (e.g., `localhost` for development).
+    2. Go to **Social Applications → Add Social Application**.
+       - Provider: **Google**
+       - Name: any label (e.g., `Google OAuth`)
+       - Client ID and Secret Key: leave blank — they are read from environment variables via `SOCIALACCOUNT_PROVIDERS`.
+       - Sites: move your site to **Chosen sites**.
+  </Step>
+</Steps>

@@ -1,0 +1,178 @@
+---
+title: 'Database Configuration'
+description: PostgreSQL setup and database management for cineCDMX.
+---
+
+cineCDMX requires **PostgreSQL** as its database engine. SQLite is not supported in production. The Python adapter `psycopg2-binary` is included in the project requirements.
+
+## Connection setup
+
+The database connection is configured entirely through the `DATABASE_URL` environment variable. `dj-database-url` parses the URL and applies it to Django's `DATABASES` setting:
+
+```python settings.py
+DATABASES = {
+    'default': dj_database_url.config(
+        default=os.getenv('DATABASE_URL'),
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
+}
+```
+
+### Connection URL format
+
+```
+postgresql://USER:PASSWORD@HOST:PORT/DBNAME
+```
+
+**Example:**
+
+```
+postgresql://cine_user:secret@localhost:5432/cine_cdmx_db
+```
+
+<Note>
+  `conn_max_age=600` keeps database connections open for up to 10 minutes, reducing overhead from repeated connection setup. `conn_health_checks=True` verifies that reused connections are still alive before executing a query.
+</Note>
+
+---
+
+## Running migrations
+
+After setting `DATABASE_URL`, apply all migrations to initialize the schema:
+
+```bash
+python manage.py migrate
+```
+
+Run this command again after pulling changes that include new migration files.
+
+<Warning>
+  Always run `migrate` before starting the application for the first time or after deploying a new version. Skipping this step will cause runtime errors if the schema is out of date.
+</Warning>
+
+---
+
+## Data model overview
+
+All application tables live in the `cartelera` app (`cartelera/models.py`). The schema covers cinema branches, screening rooms, films, showtimes, tickets, and users.
+
+### Tables
+
+| Model | Table | Description |
+|---|---|---|
+| `Sucursal` | `cartelera_sucursal` | Cinema branch (e.g., CDMX Norte, Reforma, Perisur) |
+| `Sala` | `cartelera_sala` | Screening room within a branch |
+| `Genero` | `cartelera_genero` | Film genre (e.g., Acción, Drama, Terror) |
+| `Pelicula` | `cartelera_pelicula` | Film record, optionally linked to TMDB |
+| `Funcion` | `cartelera_funcion` | Scheduled showtime for a film in a room |
+| `Boleto` | `cartelera_boleto` | Ticket issued for a showtime |
+| `Usuario` | `cartelera_usuario` | Application user (admin, employee, or customer) |
+
+### Relationships
+
+```
+Sucursal
+  ├── Sala (one-to-many)
+  │     └── Funcion (one-to-many)
+  │           └── Boleto (one-to-many)
+  │                 └── Usuario (many-to-one, nullable)
+  └── Usuario (many-to-one, nullable)
+
+Pelicula
+  ├── Funcion (one-to-many)
+  └── Genero (many-to-one, nullable)
+```
+
+| Relationship | Cardinality | On delete |
+|---|---|---|
+| `Sucursal` → `Sala` | one-to-many | CASCADE |
+| `Sucursal` → `Usuario` | one-to-many (nullable) | SET NULL |
+| `Sala` → `Funcion` | one-to-many | CASCADE |
+| `Pelicula` → `Funcion` | one-to-many | CASCADE |
+| `Funcion` → `Boleto` | one-to-many | CASCADE |
+| `Usuario` → `Boleto` | one-to-many (nullable) | SET NULL |
+| `Genero` → `Pelicula` | one-to-many (nullable) | SET NULL |
+
+---
+
+## Key model constraints
+
+### `Pelicula.tmdb_id` — unique
+
+`tmdb_id` is declared `unique=True` in the model. A film's TMDB ID can be `null` (for manually entered films), but if set, no two records may share the same value.
+
+### `Usuario.correo` — unique
+
+`correo` (email address) is declared `unique=True`. Attempting to create two users with the same email will raise a database integrity error.
+
+### `Sala.numero` — unique within `Sucursal`
+
+The database does not enforce a compound unique constraint on `(numero, sucursal)` at the schema level. The uniqueness check is applied in `SalaForm.clean()` in `cartelera/forms.py`:
+
+```python cartelera/forms.py
+def clean(self):
+    cleaned_data = super().clean()
+    numero = cleaned_data.get('numero')
+    sucursal = cleaned_data.get('sucursal')
+    if numero and sucursal:
+        qs = Sala.objects.filter(numero=numero, sucursal=sucursal)
+        if self.instance and self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError(
+                f"Ya existe la sala {numero} en la sucursal {sucursal.nombre}."
+            )
+    return cleaned_data
+```
+
+<Note>
+  This validation only applies when using `SalaForm`. Creating `Sala` records directly via the Django shell or ORM bypasses this check.
+</Note>
+
+### `Boleto.precio` — defaults to 32.00, set at purchase
+
+The `precio` field has a model-level default of `32.00`, but the actual ticket price is taken from `pelicula.costo_entrada` at purchase time. The two standard price tiers defined in `PeliculaForm` are:
+
+| Tier | Price |
+|---|---|
+| Común | $32.00 MXN |
+| Estreno | $80.00 MXN |
+
+### `Sala.capacidad` — between 25 and 144
+
+`SalaForm` enforces a capacity range of 25–144 seats. The model default is 50.
+
+### `Funcion.hora_inicio` — 16:00 or 18:00 only
+
+`FuncionForm` restricts showtimes to 4:00 PM (16:00) and 6:00 PM (18:00). A room cannot have two functions at the same date and time (enforced in `FuncionForm.clean()`).
+
+---
+
+## Seeding test data
+
+The `poblar_bd.py` script at the project root populates the database with sample branches, rooms, genres, films, and showtimes. It clears all existing data before inserting.
+
+<Warning>
+  Running `poblar_bd.py` deletes all existing `Funcion`, `Sala`, `Pelicula`, `Genero`, and `Sucursal` records. Do not run it against a production database.
+</Warning>
+
+<CodeGroup>
+
+```bash Standard
+python poblar_bd.py
+```
+
+```bash With explicit settings module
+DJANGO_SETTINGS_MODULE=cine_cdmx.settings python poblar_bd.py
+```
+
+</CodeGroup>
+
+The script creates:
+
+- **4 branches:** CDMX Norte, CDMX Oriente, Reforma, Perisur
+- **2 rooms:** Sala 1 (CDMX Norte), Sala 2 (Perisur)
+- **10 genres:** Acción / Ciencia Ficción, Suspense / Misterio, Comedia, Terror, Drama, Aventura, Animación, Romance, Fantasía, Documental
+- **2 films:** Guardianes de la Galaxia (TMDB 118340), Scream 7 (TMDB 1159559)
+- **3 showtimes** scheduled for the current date

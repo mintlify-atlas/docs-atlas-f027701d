@@ -1,0 +1,59 @@
+---
+title: "Cliente (Customer)"
+description: What customers can do in cineCDMX.
+---
+
+`CLIENTE` is the default role assigned to every self-registered user and to any Google OAuth user on their first login. It is the lowest-privilege role in the system.
+
+## Authentication methods
+
+| Method | URL | Notes |
+|---|---|---|
+| Email and password | `/login/` | Credentials checked against `Usuario.correo` and `Usuario.password` |
+| Google OAuth | `/accounts/` | Handled by Django AllAuth; `Usuario` record created automatically on first cartelera visit |
+
+After a successful login the following keys are stored in the session:
+
+```python
+request.session['usuario_id']     # Usuario.id
+request.session['usuario_nombre'] # Usuario.nombre
+request.session['usuario_rol']    # 'CLIENTE'
+```
+
+## What a cliente can do
+
+### Browse the cartelera
+
+Clientes land on the main cartelera at `/`. The view (`cartelera_view`) shows all movies with `estatus=ACTIVA` and `estatus=PROXIMAMENTE`. Movies can be filtered by branch using the `?sucursal=<id>` query parameter.
+
+### View movie details
+
+Any user (including anonymous visitors) can open a movie detail page at `/pelicula/<id>/`. Upcoming funciones are listed and can also be filtered by `?sucursal=<id>`.
+
+### Purchase tickets
+
+Ticket purchase is handled by `comprar_boletos_view` at `/funcion/<id>/comprar/`. A logged-in cliente is linked to the `Boleto` record via the `usuario` foreign key. Anonymous visitors can also complete a purchase — in that case `Boleto.usuario` is left `null`.
+
+```python
+# views.py — comprar_boletos_view
+usuario = None
+if request.session.get('usuario_id'):
+    try:
+        usuario = Usuario.objects.get(id=request.session['usuario_id'])
+    except Usuario.DoesNotExist:
+        pass
+Boleto.objects.create(
+    funcion=funcion,
+    asiento=asiento,
+    precio=funcion.pelicula.costo_entrada,
+    usuario=usuario   # null for anonymous purchases
+)
+```
+
+<Note>
+Anonymous purchases are allowed by design. `Boleto.usuario` is a nullable `ForeignKey`, so no login is required to buy a ticket.
+</Note>
+
+## Redirect behaviour
+
+If a user with the `EMPLEADO` role visits the cartelera root, they are immediately redirected to `/dashboard/`. Clientes and anonymous users see the cartelera normally.

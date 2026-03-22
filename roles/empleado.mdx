@@ -1,0 +1,103 @@
+---
+title: "Empleado (Employee)"
+description: What employees can manage in cineCDMX.
+---
+
+Employees are branch staff responsible for the day-to-day operation of their assigned `Sucursal`. Every employee-only view checks the session role before proceeding:
+
+```python
+if request.session.get('usuario_rol') != 'EMPLEADO':
+    return redirect('cartelera')  # or redirect('login')
+```
+
+Employees are assigned to a `Sucursal` via `Usuario.sucursal`.
+
+## Dashboard
+
+**View:** `dashboard_empleado_view` — `/dashboard/`
+
+The main employee landing page. It loads five querysets and passes them to the template:
+
+| Context variable | Model | Default order |
+|---|---|---|
+| `clientes` | `Usuario` (rol=CLIENTE) | — |
+| `salas` | `Sala` | — |
+| `generos` | `Genero` | `nombre` |
+| `peliculas` | `Pelicula` | `titulo` |
+| `funciones` | `Funcion` | `-fecha`, `-hora_inicio` |
+
+<Note>
+The dashboard supports branch filtering via `?sucursal=<id>`. When a `sucursal` query parameter is present, `salas`, `funciones`, and `peliculas` (those with at least one funcion in that branch) are all scoped to the selected branch.
+</Note>
+
+## Movie management
+
+### Add a movie
+
+**View:** `agregar_pelicula_view` — `/agregar/`
+
+Posts a `PeliculaForm`. If the submitted movie has a `tmdb_id`, poster URL, synopsis, and runtime are fetched from the TMDB API and saved automatically if those fields are empty.
+
+### Edit a movie
+
+**View:** `editar_pelicula_view` — `/pelicula/<id>/editar/`
+
+Loads the existing `Pelicula` into a `PeliculaForm` for editing. Redirects to the movie detail page on success.
+
+### Delete a movie
+
+**View:** `eliminar_pelicula_view` — `/pelicula/<id>/eliminar/`
+
+Accepts POST only. On GET the user is redirected to the movie detail page without any deletion occurring.
+
+### Refresh TMDB data
+
+**View:** `actualizar_datos_tmdb_view` — `/pelicula/<id>/actualizar-tmdb/`
+
+Re-fetches poster, synopsis, and runtime from the TMDB API for a movie that already has a `tmdb_id`. Overwrites existing values. Redirects back to the dashboard on completion.
+
+## Screening management
+
+### Schedule a funcion
+
+**View:** `agregar_funcion_view` — `/agregar-funcion/`
+
+Posts a `FuncionForm`. Available start times are 4:00 PM (16:00) and 6:00 PM (18:00). The form validates that the selected sala/date/time combination is not already taken. Funciones can only be scheduled from tomorrow onwards.
+
+## Genre management
+
+### List and add genres
+
+**View:** `generos_view` — `/generos/`
+
+### Edit a genre
+
+**View:** `editar_genero_view` — `/generos/<id>/editar/`
+
+### Delete a genre
+
+**View:** `eliminar_genero_view` — `/generos/<id>/eliminar/`
+
+<Note>
+A genre cannot be deleted if it has movies assigned to it. The view checks `genero.pelicula_set.exists()` and returns an error message instead of deleting.
+</Note>
+
+## Sala management
+
+### List and add salas
+
+**View:** `salas_view` — `/salas/`
+
+Sala capacity must be between 25 and 144 seats. The combination of `numero` + `sucursal` must be unique.
+
+### Edit a sala
+
+**View:** `editar_sala_view` — `/salas/<id>/editar/`
+
+### Delete a sala
+
+**View:** `eliminar_sala_view` — `/salas/<id>/eliminar/`
+
+<Note>
+A sala cannot be deleted if it has funciones scheduled. The view checks `sala.funcion_set.exists()` and returns an error message instead of deleting.
+</Note>

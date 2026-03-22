@@ -1,0 +1,42 @@
+---
+title: 'API Overview'
+description: Internal JSON endpoints used by the cineCDMX employee UI.
+---
+
+cineCDMX exposes a small set of internal JSON endpoints that power the employee dashboard forms. These are **not** a public REST API — they are called directly by the browser during employee workflows such as adding movies and scheduling screenings.
+
+<Note>
+  No authentication token is required to call these endpoints. They are intended for use within the cineCDMX employee UI and rely on the Django session where relevant.
+</Note>
+
+## Base URL
+
+The base URL depends on your deployment environment. For local development:
+
+```
+http://localhost:8000
+```
+
+All three endpoints are mounted under the `/api/` path prefix.
+
+## Endpoints
+
+<CardGroup cols={1}>
+  <Card title="GET /api/buscar_tmdb/" icon="magnifying-glass" href="/api/search-tmdb">
+    Search The Movie Database (TMDB) by movie title. Returns a list of matching movies with titles, overviews, and poster paths.
+  </Card>
+  <Card title="GET /api/detalles_tmdb/" icon="film" href="/api/detalles-tmdb">
+    Retrieve the runtime in minutes for a specific movie by its TMDB ID.
+  </Card>
+  <Card title="GET /api/horarios_disponibles/" icon="clock" href="/api/horarios-disponibles">
+    Get the available screening time slots for a given sala and date. Returns only slots not already booked.
+  </Card>
+</CardGroup>
+
+## Response format
+
+All endpoints return `application/json`. There are no envelope wrappers — each endpoint returns a JSON object specific to its purpose. See each endpoint page for the exact response shape.
+
+## Error handling
+
+These endpoints do not return HTTP error codes for missing or invalid parameters. Instead, they return an empty result in the expected shape (e.g., `{"results": []}` or `{"horarios": []}`). Check each endpoint page for the specific fallback behavior.

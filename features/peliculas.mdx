@@ -1,0 +1,154 @@
+---
+title: "Peliculas (Movie Management)"
+description: Managing the movie catalog, including TMDB integration.
+---
+
+The `Pelicula` model is the core of the cineCDMX catalog. Employees manage movies from the dashboard; the public can view details and upcoming screenings on the detail page.
+
+## Pelicula model
+
+| Field | Type | Notes |
+|---|---|---|
+| `titulo` | `CharField(max_length=200)` | Auto-filled from TMDB search |
+| `clasificacion` | `CharField` (choices) | Mexican rating system — see below |
+| `genero` | `ForeignKey(Genero)` | `SET_NULL` on delete |
+| `idioma` | `CharField` | `'Inglés'` or `'Español Latino'` |
+| `duracion_minutos` | `IntegerField` | Auto-filled from TMDB if available |
+| `sinopsis` | `TextField` | Auto-filled from TMDB overview |
+| `imagen_url` | `URLField(max_length=500)` | TMDB poster URL (`w500` size), nullable |
+| `estatus` | `CharField` (choices) | `ACTIVA`, `INACTIVA`, or `PROXIMAMENTE` |
+| `costo_entrada` | `DecimalField(max_digits=6, decimal_places=2)` | `$32.00` (Común) or `$80.00` (Estreno) |
+| `tmdb_id` | `IntegerField(unique=True)` | Links to TMDB; nullable, blank allowed |
+
+### Clasificacion options (Mexican film rating system)
+
+<CardGroup cols={2}>
+  <Card title="AA">
+    Suitable for all audiences, including children.
+  </Card>
+  <Card title="A">
+    General audience.
+  </Card>
+  <Card title="B">
+    Suitable for adolescents aged 12 and older.
+  </Card>
+  <Card title="B15">
+    Suitable for adolescents aged 15 and older.
+  </Card>
+  <Card title="C">
+    Adults only (18+).
+  </Card>
+</CardGroup>
+
+### Estatus lifecycle
+
+```
+PROXIMAMENTE → ACTIVA → INACTIVA
+```
+
+Movies set to `INACTIVA` are hidden from the public cartelera. `PROXIMAMENTE` movies appear in the listing but have no funciones.
+
+## Views
+
+### `agregar_pelicula_view` — Add a movie
+
+**URL:** `POST /agregar/`  
+**Access:** Employee only (redirects to `/login/` otherwise)
+
+After saving the form, if a `tmdb_id` is set, the view calls `get_data_from_tmdb` and backfills any empty fields:
+
+- `imagen_url` — set from the TMDB `poster_path` (`w500` size) if the field is currently blank
+- `sinopsis` — set from the TMDB `overview` if the field is currently blank
+- `duracion_minutos` — set from TMDB `runtime` if the field is currently blank
+
+Only fields that are still empty are overwritten, so manually entered values are preserved.
+
+### `editar_pelicula_view` — Edit a movie
+
+**URL:** `GET/POST /pelicula/<pelicula_id>/editar/`  
+**Access:** Employee only
+
+Loads the existing `Pelicula` instance into `PeliculaForm` and saves on valid POST. On success, redirects to the movie's detail page.
+
+### `eliminar_pelicula_view` — Delete a movie
+
+**URL:** `POST /pelicula/<pelicula_id>/eliminar/`  
+**Access:** Employee only
+
+Only acts on `POST` requests — a `GET` request redirects back to the detail page without deleting anything. On successful deletion, redirects to the cartelera.
+
+<Warning>
+Deleting a `Pelicula` cascades to all related `Funcion` records (and their `Boleto` records). This action is not reversible.
+</Warning>
+
+### `detalle_pelicula_view` — Public detail page
+
+**URL:** `GET /pelicula/<pelicula_id>/`  
+**Access:** Public
+
+Shows movie metadata and its upcoming funciones (`fecha__gte=today`). Supports the `?sucursal=<id>` filter to narrow funciones to a specific branch.
+
+| Context variable | Description |
+|---|---|
+| `pelicula` | The `Pelicula` instance |
+| `funciones` | Upcoming funciones, ordered by `fecha` then `hora_inicio` |
+| `sucursales` | All branches for the filter UI |
+| `sucursal_seleccionada` | Active branch filter ID |
+
+### `actualizar_datos_tmdb_view` — Refresh TMDB data
+
+**URL:** `POST /pelicula/<pelicula_id>/actualizar-tmdb/`  
+**Access:** Employee only
+
+Forces a fresh fetch from TMDB and overwrites `imagen_url`, `sinopsis`, and `duracion_minutos` with the latest values (unlike the add flow, this always overwrites). Redirects to `dashboard_empleado` on completion.
+
+<Note>
+If the movie has no `tmdb_id`, the view issues a warning message and redirects without making any changes.
+</Note>
+
+## PeliculaForm
+
+### Read-only fields (filled via TMDB search)
+
+The following fields use the `readonly` HTML attribute and are populated automatically by the TMDB search widget on the add/edit page:
+
+- `titulo`
+- `tmdb_id`
+- `sinopsis`
+- `imagen_url`
+
+<Tip>
+The TMDB search calls `/api/buscar_tmdb/?query=<term>` and `/api/detalles_tmdb/?tmdb_id=<id>` to populate these fields before the form is submitted.
+</Tip>
+
+### Editable fields
+
+| Field | Widget | Notes |
+|---|---|---|
+| `clasificacion` | Select | Five choices from Mexican rating system |
+| `genero` | Select | Foreign key to `Genero` |
+| `idioma` | Select | `'Inglés'` or `'Español Latino'` |
+| `duracion_minutos` | NumberInput | Max value hint: 240 (enforced up to 500 by validation) |
+| `costo_entrada` | Select | `$32.00` (Común) or `$80.00` (Estreno) |
+| `estatus` | Select | `ACTIVA`, `INACTIVA`, `PROXIMAMENTE` |
+
+### Validation rules
+
+| Field | Rule |
+|---|---|
+| `titulo` | Required; cannot be blank after stripping whitespace |
+| `sinopsis` | Required; cannot be blank after stripping whitespace |
+| `imagen_url` | Required; cannot be blank after stripping whitespace |
+| `duracion_minutos` | Required; must be between 1 and 500 (inclusive) |
+
+## URL patterns
+
+| Method | URL | View | Name |
+|---|---|---|---|
+| GET | `/pelicula/<id>/` | `detalle_pelicula_view` | `detalle_pelicula` |
+| GET/POST | `/agregar/` | `agregar_pelicula_view` | `agregar_pelicula` |
+| GET/POST | `/pelicula/<id>/editar/` | `editar_pelicula_view` | `editar_pelicula` |
+| POST | `/pelicula/<id>/eliminar/` | `eliminar_pelicula_view` | `eliminar_pelicula` |
+| POST | `/pelicula/<id>/actualizar-tmdb/` | `actualizar_datos_tmdb_view` | `actualizar_tmdb` |
+| GET | `/api/buscar_tmdb/` | `search_tmdb_view` | `search_tmdb_api` |
+| GET | `/api/detalles_tmdb/` | `detalles_tmdb_view` | `detalles_tmdb_api` |

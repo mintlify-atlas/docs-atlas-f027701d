@@ -1,0 +1,122 @@
+---
+title: "Deployment"
+description: "Deploy cineCDMX to production using Gunicorn and PostgreSQL."
+---
+
+cineCDMX is designed for Procfile-compatible platforms such as Railway, Heroku, and Render. It uses Gunicorn as the production application server and WhiteNoise to serve static files without a separate web server.
+
+## Prerequisites
+
+Before deploying, make sure you have:
+
+- A PostgreSQL database provisioned and its connection URL ready
+- A strong, unique value for `SECRET_KEY`
+- Your domain name or platform-assigned hostname for `ALLOWED_HOSTS`
+
+## Environment variables
+
+Set the following environment variables in your deployment platform's dashboard or config:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `SECRET_KEY` | Yes | A long, random string. Never use the default value in production. |
+| `DEBUG` | Yes | Must be `False` in production. |
+| `DATABASE_URL` | Yes | Full PostgreSQL connection URL, e.g. `postgres://user:pass@host:5432/dbname`. |
+| `ALLOWED_HOSTS` | Yes | Comma-separated list of your production hostnames, e.g. `cinecdmx.up.railway.app`. |
+| `TMDB_API_KEY` | Yes | Your TMDB API key. |
+| `GOOGLE_CLIENT_ID` | No | Google OAuth client ID, if using social login. |
+| `GOOGLE_CLIENT_SECRET` | No | Google OAuth client secret, if using social login. |
+
+<Warning>
+  Set `SECRET_KEY` to a strong, randomly generated value before deploying. The default value in the repository is insecure and must never be used in production.
+</Warning>
+
+<Warning>
+  Always set `DEBUG=False` in production. Running with `DEBUG=True` exposes detailed error pages and internal configuration to the public.
+</Warning>
+
+## Deployment steps
+
+<Steps>
+  <Step title="Set environment variables">
+    Configure all required environment variables in your platform's settings. See the table above for the full list.
+  </Step>
+
+  <Step title="Collect static files">
+    Run this command as part of your build step to bundle all static assets:
+
+    ```bash
+    python manage.py collectstatic --noinput
+    ```
+
+    WhiteNoise is already configured in `settings.py` to compress and serve these files:
+
+    ```python
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+    ```
+
+    <Note>
+      WhiteNoise is loaded as middleware in `MIDDLEWARE` before any other middleware except `SecurityMiddleware`, which is the recommended configuration for optimal performance.
+    </Note>
+  </Step>
+
+  <Step title="Run database migrations">
+    Run migrations against your production database before starting the server:
+
+    ```bash
+    python manage.py migrate
+    ```
+
+    On most platforms you can add this as a release command or pre-deploy hook.
+  </Step>
+
+  <Step title="Start the web process">
+    cineCDMX includes a `Procfile` that tells the platform how to start the app:
+
+    ```
+    web: gunicorn cine_cdmx.wsgi:application
+    ```
+
+    Procfile-compatible platforms (Railway, Heroku, Render) will detect this file automatically and run Gunicorn to serve the application.
+  </Step>
+</Steps>
+
+## Platform-specific notes
+
+<CodeGroup>
+
+```bash Railway
+# Set environment variables in the Railway dashboard under Variables.
+# Add a PostgreSQL service and copy the DATABASE_URL it provides.
+# Railway detects the Procfile automatically.
+```
+
+```bash Heroku
+# Set environment variables with the Heroku CLI:
+heroku config:set SECRET_KEY=your-secret-key
+heroku config:set DEBUG=False
+heroku config:set DATABASE_URL=postgres://...
+
+# Heroku detects the Procfile automatically.
+# Add a release command in the Procfile for migrations:
+# release: python manage.py migrate
+```
+
+```bash Render
+# Set environment variables in the Render dashboard under Environment.
+# Use a Render PostgreSQL instance and copy the internal DATABASE_URL.
+# Set the start command to: gunicorn cine_cdmx.wsgi:application
+# Add a pre-deploy command: python manage.py migrate
+```
+
+</CodeGroup>
+
+## Database URL format
+
+`DATABASE_URL` is parsed by `dj-database-url`, which is included in `requirements.txt`. The expected format is a standard PostgreSQL URL:
+
+```
+postgres://USER:PASSWORD@HOST:PORT/DBNAME
+```
+
+Most managed database providers (Railway, Heroku Postgres, Render Postgres, Supabase) provide a connection URL in exactly this format.

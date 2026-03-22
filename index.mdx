@@ -1,97 +1,64 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "cineCDMX"
+description: "Cinema management platform for Mexico City — browse movies, buy tickets, and manage screenings across multiple branches."
 ---
 
-## Setting up
-
-Get your documentation site up and running in minutes.
-
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get cineCDMX running locally in minutes
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Deployment" icon="server" href="/deployment">
+    Deploy to production with Gunicorn and PostgreSQL
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="User Roles" icon="users" href="/roles/overview">
+    Understand the three-tier permission system
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="API Reference" icon="code" href="/api/overview">
+    Internal JSON endpoints for TMDB and scheduling
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## What is cineCDMX?
 
-Everything you need to create world-class documentation.
+cineCDMX is a full-stack Django web application that powers cinema operations for Mexico City locations. It provides a public-facing movie catalog with ticket purchasing, an employee dashboard for managing movies and screenings, and an admin panel for branch and user management.
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
+<CardGroup cols={3}>
+  <Card title="Cartelera" icon="film" href="/features/cartelera">
+    Public movie listings with branch filtering
   </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
+  <Card title="Peliculas" icon="clapperboard" href="/features/peliculas">
+    Movie catalog with TMDB integration
   </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
+  <Card title="Funciones" icon="calendar" href="/features/funciones">
+    Screening schedule management
   </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
+  <Card title="Boletos" icon="ticket" href="/features/boletos">
+    Seat selection and ticket purchasing
   </Card>
-</Columns>
+  <Card title="Sucursales" icon="building" href="/features/sucursales">
+    Multi-branch support across CDMX
+  </Card>
+  <Card title="TMDB" icon="star" href="/integrations/tmdb">
+    Automatic movie data from TMDB API
+  </Card>
+</CardGroup>
 
-## Need inspiration?
+## Key capabilities
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+- **Multi-branch operations** — Manage screenings independently across CDMX Norte, Oriente, Reforma, Perisur and more
+- **TMDB integration** — Automatically pull movie posters, synopses, and runtime from The Movie Database API
+- **Role-based access** — Three distinct roles: Cliente (customer), Empleado (employee), and Admin
+- **Google OAuth** — Customers can sign in with their Google account via django-allauth
+- **Conflict detection** — The system prevents double-booking a sala at the same date and time
+- **Interactive seat map** — Customers choose specific seats before purchase; occupied seats are shown in real time
+
+## Technology stack
+
+| Component | Technology |
+|-----------|-----------|
+| Backend | Django 5.2 + Django REST Framework |
+| Database | PostgreSQL (via psycopg2) |
+| Auth | django-allauth (Google OAuth) + session auth |
+| Server | Gunicorn |
+| Static files | WhiteNoise |
+| External API | The Movie Database (TMDB) |

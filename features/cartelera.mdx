@@ -1,0 +1,84 @@
+---
+title: "Cartelera (Movie Listings)"
+description: The public-facing movie listings page with branch filtering.
+---
+
+The cartelera is the main entry point for cineCDMX. It displays currently showing and upcoming movies, supports filtering by branch (sucursal), and handles automatic account provisioning for Google-authenticated users.
+
+## URL
+
+```
+GET /
+GET /?sucursal=<id>
+```
+
+## How it works
+
+### Movie display
+
+The view (`cartelera_view`) queries two sets of movies and combines them in order:
+
+1. **Películas activas** — filtered by `estatus=ACTIVA`. When a branch filter is active, only movies with upcoming `funciones` at that branch are shown (`funciones__fecha__gte=hoy`).
+2. **Próximamente** — filtered by `estatus=PROXIMAMENTE`. These are always listed regardless of the branch filter, as they have no scheduled funciones yet.
+
+The two querysets are merged with `itertools.chain` and passed to the template as a single `peliculas` list.
+
+### Branch filtering
+
+Pass a `sucursal` query parameter to narrow the listing:
+
+```
+/?sucursal=3
+```
+
+All available branches are always passed to the template as `sucursales`, so the filter UI is always populated. The currently selected branch ID is passed as `sucursal_seleccionada`.
+
+<Note>
+Date filtering applies only to active movies. A movie with `estatus=ACTIVA` will not appear under a branch filter unless it has at least one `Funcion` at that branch with `fecha >= today`. Movies marked `PROXIMAMENTE` bypass this check entirely.
+</Note>
+
+### Google sign-in and automatic account creation
+
+When a user authenticates via Google (AllAuth) and visits the cartelera for the first time (i.e., `usuario_id` is not yet in their session), a `Usuario` record is automatically created or retrieved:
+
+```python
+usuario, _ = Usuario.objects.get_or_create(
+    correo=request.user.email,
+    defaults={
+        'nombre': request.user.first_name + ' ' + request.user.last_name,
+        'password': 'NoAplica_SeLogueaPorGoogle',
+        'rol': 'CLIENTE',
+    }
+)
+```
+
+The user's `id`, `nombre`, and `rol` are stored in the session immediately after. On every subsequent visit the session already contains `usuario_id`, so `get_or_create` is not called again.
+
+### Employee redirect
+
+If the session contains `usuario_rol = 'EMPLEADO'`, the view redirects to `dashboard_empleado` before rendering anything. Employees never see the public cartelera.
+
+<Tip>
+Employees can still browse the cartelera by navigating directly to `/pelicula/<id>/` — the detail view has no role restriction.
+</Tip>
+
+## Context variables
+
+| Variable | Type | Description |
+|---|---|---|
+| `peliculas` | list | Combined active + upcoming movies |
+| `sucursales` | QuerySet | All branches for the filter UI |
+| `sucursal_seleccionada` | str \| None | ID of the currently active branch filter |
+
+## Performance note
+
+<Note>
+TMDB data (poster, synopsis, runtime) is **not** fetched during the cartelera listing. An earlier version of the view looped over every movie and made external HTTP requests, which caused significant slowness on page load. TMDB data is now loaded only when a movie is first added via `agregar_pelicula_view`, or manually refreshed by an employee from the dashboard using the `actualizar_datos_tmdb_view` endpoint.
+</Note>
+
+## URL patterns
+
+| Method | URL | View | Name |
+|---|---|---|---|
+| GET | `/` | `cartelera_view` | `cartelera` |
+| GET | `/?sucursal=<id>` | `cartelera_view` | `cartelera` |

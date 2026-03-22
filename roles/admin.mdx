@@ -1,0 +1,59 @@
+---
+title: "Admin"
+description: What administrators can manage in cineCDMX.
+---
+
+Admins have exclusive access to user management. Every admin-only view checks the session role and redirects to login if the check fails:
+
+```python
+if request.session.get('usuario_rol') != 'ADMIN':
+    return redirect('login')
+```
+
+<Warning>
+There is no self-registration path for the `ADMIN` role. Admin accounts must be created manually by an existing Admin from the `/usuarios/` panel. If no admin exists yet, the first one must be inserted directly into the database.
+</Warning>
+
+## User management
+
+### List and create users
+
+**View:** `usuarios_view` — `/usuarios/`
+
+Displays all `Usuario` records ordered by `rol` then `nombre`. The same page hosts an inline `UsuarioForm` to create new users with any role.
+
+### Edit a user
+
+**View:** `editar_usuario_view` — `/usuarios/<id>/editar/`
+
+Allows editing all `UsuarioForm` fields for any user, including their role and sucursal assignment.
+
+### Delete a user
+
+**View:** `eliminar_usuario_view` — `/usuarios/<id>/eliminar/`
+
+Accepts POST only. The admin cannot delete their own account:
+
+```python
+# views.py — eliminar_usuario_view
+if usuario.id == request.session.get('usuario_id'):
+    # returns error message, does not delete
+```
+
+## UsuarioForm fields
+
+| Field | Type | Validation |
+|---|---|---|
+| `nombre` | Text | Required; min 3 characters; must contain at least one letter |
+| `correo` | Email | Required; must be unique across all `Usuario` records |
+| `password` | Password | Required; min 6 characters |
+| `rol` | Select | One of `CLIENTE`, `EMPLEADO`, `ADMIN` |
+| `sucursal` | Select | Foreign key to `Sucursal`; required by the form |
+
+<Warning>
+Passwords are stored as plain text in the `Usuario.password` `CharField`. Django's built-in password hashing (`AbstractBaseUser` / `make_password`) is not used. This is a known limitation of the current implementation.
+</Warning>
+
+<Tip>
+Assign the correct `sucursal` when creating an `EMPLEADO` account. The employee dashboard uses `Usuario.sucursal` as the default branch context.
+</Tip>

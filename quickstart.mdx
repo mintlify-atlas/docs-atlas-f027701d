@@ -1,80 +1,154 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Get cineCDMX running locally in under 10 minutes."
 ---
 
-## Get started in three steps
+This guide walks you through cloning the repository, configuring your environment, and running cineCDMX on your local machine.
 
-Get your documentation site running locally and make your first customization.
+<Note>
+  You need Python 3.10+, PostgreSQL, and a [free TMDB API key](https://www.themoviedb.org/settings/api) before starting. Google OAuth is optional for local development.
+</Note>
 
-### Step 1: Set up your local environment
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/IsaacMO214/cineCDMX.git
+    cd cineCDMX
+    ```
+  </Step>
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+  <Step title="Create and activate a virtual environment">
+    <CodeGroup>
+      ```bash macOS / Linux
+      python3 -m venv venv
+      source venv/bin/activate
+      ```
 
-### Step 2: Deploy your changes
+      ```bash Windows
+      python -m venv venv
+      venv\Scripts\activate
+      ```
+    </CodeGroup>
+  </Step>
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+  <Step title="Install dependencies">
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    Key packages installed:
+    - **Django 5.2** — web framework
+    - **djangorestframework** — REST API support
+    - **django-allauth** — Google OAuth
+    - **psycopg2-binary** — PostgreSQL adapter
+    - **gunicorn** — production WSGI server
+    - **whitenoise** — static file serving
+    - **python-dotenv** — `.env` file loading
+    - **dj-database-url** — parses `DATABASE_URL`
+  </Step>
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+  <Step title="Configure environment variables">
+    Create a `.env` file in the project root:
 
-### Step 3: Go live
+    ```bash .env
+    SECRET_KEY=your-secret-key-here
+    DEBUG=True
+    DATABASE_URL=postgresql://user:password@localhost:5432/cinecdmx
+    ALLOWED_HOSTS=127.0.0.1,localhost
+    TMDB_API_KEY=your-tmdb-api-key-here
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    # Optional — only needed for Google OAuth
+    GOOGLE_CLIENT_ID=
+    GOOGLE_CLIENT_SECRET=
+    ```
+
+    | Variable | Required | Description |
+    |----------|----------|-------------|
+    | `SECRET_KEY` | Yes | Django secret key — use a strong random value |
+    | `DEBUG` | No | Set to `True` for development (default: `False`) |
+    | `DATABASE_URL` | Yes | PostgreSQL connection URL |
+    | `ALLOWED_HOSTS` | No | Comma-separated hostnames (default: `127.0.0.1,localhost`) |
+    | `TMDB_API_KEY` | Yes* | Required for movie poster and metadata features |
+    | `GOOGLE_CLIENT_ID` | No | Required for Google OAuth sign-in |
+    | `GOOGLE_CLIENT_SECRET` | No | Required for Google OAuth sign-in |
+
+    <Tip>
+      Get a free TMDB API key at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api). It's free and instant.
+    </Tip>
+  </Step>
+
+  <Step title="Run database migrations">
+    Make sure PostgreSQL is running and the database exists, then apply all migrations:
+
+    ```bash
+    python manage.py migrate
+    ```
+
+    This creates all tables: `Sucursal`, `Sala`, `Genero`, `Pelicula`, `Funcion`, `Boleto`, `Usuario`, plus all allauth and session tables.
+  </Step>
+
+  <Step title="Seed sample data (optional)">
+    Populate the database with sample branches, movies, and screenings:
+
+    ```bash
+    python poblar_bd.py
+    ```
+
+    This script creates:
+    - **4 branches**: CDMX Norte, CDMX Oriente, Reforma, Perisur
+    - **2 salas**: Sala 1 (CDMX Norte), Sala 2 (Perisur)
+    - **10 genres**: Acción/Ciencia Ficción, Suspense/Misterio, Comedia, Terror, Drama, Aventura, Animación, Romance, Fantasía, Documental
+    - **2 movies**: Guardianes de la Galaxia (TMDB ID: 118340, $80.00), Scream 7 (TMDB ID: 1159559, $85.00)
+    - **3 funciones** scheduled for today
+
+    <Warning>
+      `poblar_bd.py` deletes all existing data before seeding. Do not run it against a database with real data.
+    </Warning>
+  </Step>
+
+  <Step title="Create a superuser">
+    Create a Django admin superuser to access `/admin/`:
+
+    ```bash
+    python manage.py createsuperuser
+    ```
+
+    <Note>
+      To create an **Admin** role user for the cineCDMX interface (not Django admin), log in to `/admin/` and create a `Usuario` record with `rol=ADMIN`, or use the employee dashboard after logging in as an employee.
+    </Note>
+  </Step>
+
+  <Step title="Start the development server">
+    ```bash
+    python manage.py runserver
+    ```
+  </Step>
+
+  <Step title="Open the app">
+    Visit [http://localhost:8000](http://localhost:8000) to see the cartelera (movie listings).
+
+    | URL | Description |
+    |-----|-------------|
+    | `http://localhost:8000/` | Public cartelera |
+    | `http://localhost:8000/login/` | Login page |
+    | `http://localhost:8000/dashboard/` | Employee dashboard |
+    | `http://localhost:8000/admin/` | Django admin |
+  </Step>
+</Steps>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="User Roles" icon="users" href="/roles/overview">
+    Learn about the three permission tiers: Cliente, Empleado, and Admin
+  </Card>
+  <Card title="Deployment" icon="server" href="/deployment">
+    Deploy cineCDMX to production with Gunicorn and PostgreSQL
+  </Card>
+  <Card title="TMDB Integration" icon="star" href="/integrations/tmdb">
+    Configure automatic movie data from The Movie Database
+  </Card>
+  <Card title="Google OAuth" icon="google" href="/integrations/google-oauth">
+    Enable sign-in with Google for your customers
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

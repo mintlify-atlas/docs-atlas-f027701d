@@ -1,0 +1,106 @@
+---
+title: "Funciones (Screening Schedules)"
+description: Managing movie screening times and conflict detection.
+---
+
+A `Funcion` represents a single scheduled screening of a movie in a specific sala at a specific date and time. The system enforces strict scheduling rules to prevent conflicts and ensure operational consistency.
+
+## Funcion model
+
+| Field | Type | Notes |
+|---|---|---|
+| `pelicula` | `ForeignKey(Pelicula)` | `CASCADE` on delete |
+| `sala` | `ForeignKey(Sala)` | `CASCADE` on delete |
+| `fecha` | `DateField` | Date of the screening |
+| `hora_inicio` | `TimeField` | Start time — must be 16:00 or 18:00 |
+
+The string representation is: `"<titulo> - <fecha> <hora_inicio> en Sala <numero> - <sucursal>"`
+
+## Scheduling rules
+
+All scheduling constraints are enforced in `FuncionForm`.
+
+### Allowed showtimes
+
+Only two showtimes are permitted:
+
+| Label | Value |
+|---|---|
+| 4:00 PM | `16:00:00` |
+| 6:00 PM | `18:00:00` |
+
+Any other value raises a `ValidationError`. The form field is a `ChoiceField` that populates its options dynamically from the `horarios_disponibles_view` API after a sala and date are selected.
+
+### Minimum scheduling date
+
+Functions must be scheduled for **tomorrow or later**. The date input widget sets its `min` attribute to tomorrow's date, and `clean_fecha` enforces this server-side:
+
+```python
+if fecha <= datetime.date.today():
+    raise forms.ValidationError(
+        "La función solo puede ser programada a partir del día de mañana."
+    )
+```
+
+### Conflict detection
+
+The `clean` method checks for an existing `Funcion` with the same `sala`, `fecha`, and `hora_inicio`:
+
+```python
+if Funcion.objects.filter(sala=sala, fecha=fecha, hora_inicio=hora_inicio).exists():
+    raise forms.ValidationError(
+        "¡Choque de Horarios! Ya existe una función programada en esa Sala, Fecha y Hora."
+    )
+```
+
+<Warning>
+Conflict detection runs at form validation time. Two concurrent submissions for the same slot could theoretically both pass validation before either is saved. For production use, a unique constraint on `(sala, fecha, hora_inicio)` at the database level is recommended.
+</Warning>
+
+## `horarios_disponibles_view` API
+
+**URL:** `GET /api/horarios_disponibles/?sala=<id>&fecha=<YYYY-MM-DD>`  
+**Returns:** JSON
+
+This endpoint is called by the add-funcion form UI when the user selects a sala and date. It returns the showtimes that are still available (i.e., not already booked):
+
+```json
+{
+  "horarios": [
+    { "value": "16:00:00", "label": "4:00 PM (16:00)" },
+    { "value": "18:00:00", "label": "6:00 PM (18:00)" }
+  ]
+}
+```
+
+If both slots are taken, the `horarios` array is empty. If either `sala` or `fecha` is missing from the request, an empty array is returned immediately.
+
+## `agregar_funcion_view`
+
+**URL:** `GET/POST /agregar-funcion/`  
+**Access:** Employee only (redirects to `/login/` otherwise)
+
+On `GET`, the view builds a `salas_json` dictionary mapping each sucursal ID to its list of salas. This is passed to the template as a JSON blob so the form can dynamically filter the sala dropdown when the user changes the branch:
+
+```python
+salas_por_sucursal = {
+    str(suc.id): [
+        {'id': sala.id, 'text': f'Sala {sala.numero}'}
+        for sala in suc.salas.all()
+    ]
+    for suc in Sucursal.objects.prefetch_related('salas').all()
+}
+```
+
+On valid `POST`, the funcion is saved and the user is redirected to the cartelera.
+
+<Note>
+The sala dropdown is populated client-side using `salas_json`. Selecting a branch filters the available salas, and selecting a sala + date triggers a call to `horarios_disponibles_view` to update the time slot options.
+</Note>
+
+## URL patterns
+
+| Method | URL | View | Name |
+|---|---|---|---|
+| GET/POST | `/agregar-funcion/` | `agregar_funcion_view` | `agregar_funcion` |
+| GET | `/api/horarios_disponibles/` | `horarios_disponibles_view` | `horarios_disponibles_api` |

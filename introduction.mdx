@@ -1,0 +1,57 @@
+---
+title: "Introduction"
+description: "Overview of cineCDMX — what it is, who it's for, and how it works."
+---
+
+cineCDMX is a Django 5.2 cinema management platform built for Mexico City. It provides a public-facing cartelera (listings) for customers, a ticket purchasing flow, an employee dashboard, and full administrative control — all backed by PostgreSQL and integrated with the TMDB movie database.
+
+## Who it's for
+
+cineCDMX serves three types of users:
+
+| Role | Description |
+|------|-------------|
+| **Cliente** | A registered customer who browses the cartelera, selects a función, and purchases tickets online. |
+| **Empleado** | A cinema staff member who manages screenings, validates tickets, and uses the employee dashboard. |
+| **Admin** | A superuser with full access to the Django admin panel, user management, branch configuration, and all platform data. |
+
+## Key capabilities
+
+- **Cartelera pública** — A public listings page showing currently active películas and their funciones across all branches, requiring no login.
+- **Ticket purchasing** — Authenticated customers can select a función and purchase tickets through the platform.
+- **Employee dashboard** — Employees have a dedicated interface to manage daily operations.
+- **TMDB integration** — Movies can be linked to The Movie Database (TMDB) for enriched metadata such as posters and descriptions.
+- **Google OAuth** — Customers can sign in with their Google account via django-allauth.
+- **Multi-branch support** — The platform supports multiple Sucursales (branches) across Mexico City, each with their own salas and funciones.
+
+## Technology stack
+
+| Component | Technology |
+|-----------|------------|
+| Web framework | Django 5.2.12 |
+| REST API | Django REST Framework 3.16.1 |
+| Database | PostgreSQL (via psycopg2-binary) |
+| Authentication | django-allauth 65.15.0 (local + Google OAuth) |
+| Application server | Gunicorn 25.1.0 |
+| Static files | WhiteNoise 6.12.0 |
+| Movie data | TMDB API |
+| Database URL parsing | dj-database-url 3.1.2 |
+| Environment variables | python-dotenv 1.2.2 |
+| Locale | Spanish (Mexico), `America/Mexico_City` timezone |
+
+## Where to go next
+
+<Columns cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get cineCDMX running locally in under 10 minutes.
+  </Card>
+  <Card title="Core features" icon="film" href="/features/cartelera">
+    Explore the cartelera, peliculas, funciones, and boletos.
+  </Card>
+  <Card title="User roles" icon="users" href="/roles/overview">
+    Learn what each role can do in the platform.
+  </Card>
+  <Card title="API reference" icon="code" href="/api/overview">
+    Browse the internal API endpoints.
+  </Card>
+</Columns>

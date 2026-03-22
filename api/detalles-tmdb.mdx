@@ -1,0 +1,50 @@
+---
+title: 'Movie Details from TMDB'
+description: Get the runtime in minutes for a movie by its TMDB ID.
+---
+
+Retrieves the runtime for a specific movie from TMDB. This endpoint is called by the employee dashboard after selecting a movie from search results, so the runtime field can be pre-filled when creating a new movie record.
+
+```
+GET /api/detalles_tmdb/
+```
+
+## Query parameters
+
+<ParamField query="tmdb_id" type="integer" required>
+  The TMDB movie ID. Obtain this from the `id` field in the [Search TMDB](/api/search-tmdb) response.
+</ParamField>
+
+## Response fields
+
+<ResponseField name="runtime" type="integer | null | string">
+  Runtime of the movie in minutes, as reported by TMDB.
+
+  - Returns an integer (e.g., `121`) when TMDB has runtime data for the movie.
+  - Returns `null` when the movie exists on TMDB but has no runtime recorded.
+  - Returns `""` (empty string) when `tmdb_id` is missing from the request.
+</ResponseField>
+
+## Fallback behavior
+
+| Condition | Response |
+|---|---|
+| `tmdb_id` is missing | `{"runtime": ""}` |
+| TMDB connection error | `{"runtime": null}` |
+| Movie has no runtime in TMDB | `{"runtime": null}` |
+
+## Example
+
+**Request**
+
+```http
+GET /api/detalles_tmdb/?tmdb_id=118340
+```
+
+**Response**
+
+```json
+{
+  "runtime": 121
+}
+```

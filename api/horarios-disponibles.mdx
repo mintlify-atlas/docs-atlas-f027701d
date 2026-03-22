@@ -1,0 +1,87 @@
+---
+title: 'Available Showtimes'
+description: Get available screening time slots for a sala on a given date.
+---
+
+Returns the screening time slots that have not yet been booked for a given sala and date. Used by the employee dashboard's "Add Screening" form to populate the available start times before saving a new `Funcion` record.
+
+```
+GET /api/horarios_disponibles/
+```
+
+## Query parameters
+
+<ParamField query="sala" type="integer" required>
+  The ID of the sala (screening room) to check.
+</ParamField>
+
+<ParamField query="fecha" type="string" required>
+  The date to check, in `YYYY-MM-DD` format.
+</ParamField>
+
+## Response fields
+
+<ResponseField name="horarios" type="object[]">
+  List of available time slots. Only slots that do not already have a `Funcion` record for the given sala and date are returned.
+  <Expandable title="horario object properties">
+    <ResponseField name="value" type="string">
+      Time value in `HH:MM:SS` format. Use this as the `hora_inicio` when creating a `Funcion`.
+    </ResponseField>
+    <ResponseField name="label" type="string">
+      Human-readable label for display in the UI (e.g., `"4:00 PM (16:00)"`).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Possible time slots
+
+cineCDMX supports two daily screening times:
+
+| Value | Label |
+|---|---|
+| `16:00:00` | `4:00 PM (16:00)` |
+| `18:00:00` | `6:00 PM (18:00)` |
+
+Only slots that are not already taken by an existing `Funcion` for the requested sala and date are included in the response.
+
+## Fallback behavior
+
+| Condition | Response |
+|---|---|
+| `sala` or `fecha` is missing | `{"horarios": []}` |
+| Both slots already booked | `{"horarios": []}` |
+
+## Examples
+
+**Both slots available**
+
+```http
+GET /api/horarios_disponibles/?sala=1&fecha=2026-03-25
+```
+
+```json
+{
+  "horarios": [
+    {"value": "16:00:00", "label": "4:00 PM (16:00)"},
+    {"value": "18:00:00", "label": "6:00 PM (18:00)"}
+  ]
+}
+```
+
+**16:00 already booked**
+
+```http
+GET /api/horarios_disponibles/?sala=1&fecha=2026-03-25
+```
+
+```json
+{
+  "horarios": [
+    {"value": "18:00:00", "label": "6:00 PM (18:00)"}
+  ]
+}
+```
+
+<Note>
+  Slot availability is checked against the `Funcion` model using an exact match on both `sala_id` and `fecha`. A slot is only excluded if a `Funcion` already exists with the same sala, date, and start time.
+</Note>
