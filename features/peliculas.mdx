@@ -97,10 +97,10 @@ Shows movie metadata and its upcoming funciones (`fecha__gte=today`). Supports t
 
 ### `actualizar_datos_tmdb_view` — Refresh TMDB data
 
-**URL:** `POST /pelicula/<pelicula_id>/actualizar-tmdb/`  
+**URL:** `GET /pelicula/<pelicula_id>/actualizar-tmdb/`  
 **Access:** Employee only
 
-Forces a fresh fetch from TMDB and overwrites `imagen_url`, `sinopsis`, and `duracion_minutos` with the latest values (unlike the add flow, this always overwrites). Redirects to `dashboard_empleado` on completion.
+Forces a fresh fetch from TMDB and overwrites `imagen_url`, `sinopsis`, and `duracion_minutos` with the latest values (unlike the add flow, this always overwrites existing non-null data). Redirects to `dashboard_empleado` on completion.
 
 <Note>
 If the movie has no `tmdb_id`, the view issues a warning message and redirects without making any changes.
@@ -149,6 +149,6 @@ The TMDB search calls `/api/buscar_tmdb/?query=<term>` and `/api/detalles_tmdb/?
 | GET/POST | `/agregar/` | `agregar_pelicula_view` | `agregar_pelicula` |
 | GET/POST | `/pelicula/<id>/editar/` | `editar_pelicula_view` | `editar_pelicula` |
 | POST | `/pelicula/<id>/eliminar/` | `eliminar_pelicula_view` | `eliminar_pelicula` |
-| POST | `/pelicula/<id>/actualizar-tmdb/` | `actualizar_datos_tmdb_view` | `actualizar_tmdb` |
+| GET | `/pelicula/<id>/actualizar-tmdb/` | `actualizar_datos_tmdb_view` | `actualizar_tmdb` |
 | GET | `/api/buscar_tmdb/` | `search_tmdb_view` | `search_tmdb_api` |
 | GET | `/api/detalles_tmdb/` | `detalles_tmdb_view` | `detalles_tmdb_api` |

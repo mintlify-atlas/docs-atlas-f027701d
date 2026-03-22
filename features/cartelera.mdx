@@ -45,7 +45,8 @@ When a user authenticates via Google (AllAuth) and visits the cartelera for the 
 usuario, _ = Usuario.objects.get_or_create(
     correo=request.user.email,
     defaults={
-        'nombre': request.user.first_name + ' ' + request.user.last_name,
+        'nombre': f"{request.user.first_name} {request.user.last_name}".strip()
+                  or request.user.username,
         'password': 'NoAplica_SeLogueaPorGoogle',
         'rol': 'CLIENTE',
     }

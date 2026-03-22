@@ -101,6 +101,10 @@ This guide walks you through cloning the repository, configuring your environmen
     - **2 movies**: Guardianes de la Galaxia (TMDB ID: 118340, $80.00), Scream 7 (TMDB ID: 1159559, $85.00)
     - **3 funciones** scheduled for today
 
+    <Note>
+      The seed script inserts records directly via the ORM, bypassing `PeliculaForm` validation. The employee form restricts `costo_entrada` to $32.00 (Común) or $80.00 (Estreno), but seeded data can use other values like $85.00.
+    </Note>
+
     <Warning>
       `poblar_bd.py` deletes all existing data before seeding. Do not run it against a database with real data.
     </Warning>
@@ -114,7 +118,7 @@ This guide walks you through cloning the repository, configuring your environmen
     ```
 
     <Note>
-      To create an **Admin** role user for the cineCDMX interface (not Django admin), log in to `/admin/` and create a `Usuario` record with `rol=ADMIN`, or use the employee dashboard after logging in as an employee.
+      To create an **Admin** role user for the cineCDMX interface (not Django admin), log in to the Django admin at `/admin/` and create a `Usuario` record with `rol=ADMIN`. There is no self-registration in cineCDMX — all accounts are created by an Admin via `/usuarios/` or directly in the database.
     </Note>
   </Step>
 

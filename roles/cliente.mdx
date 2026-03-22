@@ -7,10 +7,12 @@ description: What customers can do in cineCDMX.
 
 ## Authentication methods
 
+cineCDMX has two ways to sign in. There is **no self-registration** — email/password accounts must be created by an Admin via `/usuarios/`.
+
 | Method | URL | Notes |
 |---|---|---|
-| Email and password | `/login/` | Credentials checked against `Usuario.correo` and `Usuario.password` |
-| Google OAuth | `/accounts/` | Handled by Django AllAuth; `Usuario` record created automatically on first cartelera visit |
+| Email and password | `/login/` | Credentials checked against `Usuario.correo` and `Usuario.password` for existing accounts |
+| Google OAuth | `/accounts/google/login/` | Handled by Django AllAuth; `Usuario` record created automatically with `CLIENTE` role on first cartelera visit |
 
 After a successful login the following keys are stored in the session:
 

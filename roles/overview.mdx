@@ -21,11 +21,10 @@ Each protected view reads `request.session.get('usuario_rol')` and redirects una
 
 | Method | Role assigned |
 |---|---|
-| Self-registration (email/password at `/login/`) | `CLIENTE` |
 | Google OAuth via `/accounts/` | `CLIENTE` (auto-created on first visit to cartelera) |
 | Created manually by an Admin | Any role (`CLIENTE`, `EMPLEADO`, or `ADMIN`) |
 
-There is no self-registration path for `EMPLEADO` or `ADMIN`. Those accounts must be created by an existing Admin from the `/usuarios/` panel.
+There is no self-registration path in cineCDMX. The `/login/` endpoint only authenticates existing users — it does not create accounts. All new users must be created by an Admin from the `/usuarios/` panel, or via Google OAuth (which creates a `CLIENTE` automatically).
 
 ## Access summary
 

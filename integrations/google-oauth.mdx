@@ -138,7 +138,11 @@ The Google email is used as the unique key for `get_or_create`, so repeat logins
     2. Go to **Social Applications → Add Social Application**.
        - Provider: **Google**
        - Name: any label (e.g., `Google OAuth`)
-       - Client ID and Secret Key: leave blank — they are read from environment variables via `SOCIALACCOUNT_PROVIDERS`.
+       - Client ID and Secret Key: enter any placeholder values (the actual credentials are read from `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` environment variables via `SOCIALACCOUNT_PROVIDERS` in `settings.py`).
        - Sites: move your site to **Chosen sites**.
+
+    <Note>
+      A `SocialApp` record must exist and be linked to your `Site` for allauth to process the OAuth callback, even though credentials come from environment variables.
+    </Note>
   </Step>
 </Steps>
